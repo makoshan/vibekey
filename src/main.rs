@@ -1,5 +1,6 @@
 //! vibekey — third-party CLI/driver for the Ulanzi Vibe Key (AU05).
 mod device;
+mod tea;
 mod sdk;
 mod mapping;
 

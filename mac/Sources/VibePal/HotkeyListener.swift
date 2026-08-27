@@ -39,12 +39,18 @@ enum MacroTrigger {
     /// 纯按键继续直发进固件,关掉 VibePal 也生效,别平白加一个进程依赖。
     /// 纯修饰键(如地球键)主机注入没有意义,只能靠设备自己发,所以也算不需要主机。
     static func needsHost(_ mapping: ControlMapping) -> Bool {
-        guard ShortcutRunner.stroke(from: mapping.content) != nil else { return false }
+        // 纯修饰键(如地球键):主机注入一个孤立的修饰键没有意义,只能靠设备自己发。
+        // 这条优先级最高 —— 改写成哨兵的话这个键会彻底失效。
+        // 注意判 `content` 非空:完全没有按键、只有 URL/快捷指令的映射不走这条,
+        // 否则它拿不到哨兵键,按下去什么都不会发生。
+        if !mapping.content.isEmpty, ShortcutRunner.stroke(from: mapping.content) == nil { return false }
+
         // 固件一个槽位只存得下一个和弦,序列只能由主机回放
         if DeviceShortcut.chords(mapping.content).count > 1 { return true }
         if mapping.openURL?.isEmpty == false { return true }
         if mapping.runShortcut?.isEmpty == false { return true }
-        return mapping.targetBundleID != nil || !mapping.textToInsert.isEmpty
+        if !mapping.textToInsert.isEmpty { return true }
+        return mapping.targetBundleID != nil
     }
 }
 

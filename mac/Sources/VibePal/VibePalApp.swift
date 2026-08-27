@@ -14,7 +14,7 @@ struct VibePalApp: App {
                 .environmentObject(profiles)
                 .environmentObject(hotkeys)
                 .environmentObject(autoSwitch)
-                .frame(minWidth: 940, minHeight: 670)
+                .frame(minWidth: 940, minHeight: 560)
                 .onAppear {
                     if let url = Bundle.module.url(forResource: "brand-logo", withExtension: "png") {
                         NSApplication.shared.applicationIconImage = NSImage(contentsOf: url)
@@ -40,7 +40,7 @@ struct VibePalApp: App {
                 }
         }
         .windowStyle(.hiddenTitleBar)
-        .defaultSize(width: 1180, height: 840)
+        .defaultSize(width: 1180, height: 700)
 
         MenuBarExtra {
             VStack(alignment: .leading) {

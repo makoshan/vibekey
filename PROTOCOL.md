@@ -172,3 +172,49 @@ per-hook 开 SDK 要 2.7s,对每次 PreToolUse 都触发的 hook 不可用(官�
 - ✕ 键"默认无标准键码"只对**离线模式**成立;Studio 在跑时它是 `Esc`。
 - **默认配置里只有 4 个控件,没有侧边键** —— 侧边键多半不是可编程键。
 - Studio 3.2.11 把 AU05 当一等设备:`config/device_source.json` 里 `Model: AU05 / Name: "Vibe Key" / UUID: 41503533303032090100A85407400C78`。
+
+## 按键事件:真相(2026-08-27,多智能体调查 + 真机验证)
+
+**此前「收不到 deviceKeyEvent」的判断是错的。** 事件一直在触发,我查错了地方:
+Kehwin SDK 自己的日志**只记调用名、不记回调内容**,所以 grep 它永远是 0 条。
+
+证据:
+- 抢救出的 `/tmp/vibepal_debug.log` 里有 **17 条 deviceKeyEvent**(access=2,index 0/1/2/5,按下/抬起成对)。
+- 2026-08-24 的 549 条抓包里有 **50 条按键帧**,可解密可读。
+
+### 线上帧格式(真机逐条验证)
+```
+8b 10 <function> <status> <index_lo> <index_hi>
+ │  └ 子类型 0x10 = 按键
+ └ 0x8b:bit7=设备→主机,低 5 位 0x0B=通知类
+```
+| function | index | 控件 | 抓包表现 |
+|---|---|---|---|
+| 110 | 3 | 旋钮按下 | 按下/抬起成对 |
+| 111 | 0 | 语音键 | 7 对 |
+| 112 | 1 | ✓ | 1 对 |
+| 114 | 4 | 旋钮一向 | **21 条全是 status=1** |
+| 115 | 5 | 旋钮另一向 | **11 条全是 status=1** |
+
+**坑 1**:SDK 回调选择器叫 `index:status:physicalIndex:`,但 AU05 命中了一张设备覆盖表
+(`isSwitchKeyIndex=1` / `isUploadPhysicalIndex=0`),对外报的 `index` 取自 byte[4],
+byte[2] 其实是 function 码。按选择器字面意思解读会错位。
+
+**坑 2**:旋钮转动(function 114/115)**只发 status=1,没有抬起事件** —— 是自动重复脉冲。
+写解析器时别等配对的 release,否则永远等不到。
+
+### 已被推翻的猜测
+- ~~需要发「激活/订阅」命令才会上报按键~~ —— 官方 1131 条 SetReport 解密后只有 7 种命令,
+  没有任何「开启按键上报」的东西。
+- ~~setDeviceHooksMode 是按键上报开关~~ —— 它是**指示灯参数**(`led_hooks_param_cfg_t`,
+  属性 0x0B/0x89,与 IndicatorLightAllParams 0x0B/0x88 同族)。语义是「主机侧 AI agent
+  hook 是否已安装」,推给设备让它知道 AI 模式可用。跟按键毫无关系。
+  存不住也不是我们的问题:官方 app 读回来同样永远是 0,固件对属性 0x89 没有存储后端。
+- ~~function 110~116 是可切换的功能码~~ —— `getDeviceSupportButtonFunc` 回的 status 是
+  8 位掩码,值 0 = 固件声明「自定义按键功能一项都不支持」。官方 app 干脆不 dlsym 这组 API。
+
+### 其他修正
+- **那条 ~10 秒的「心跳」其实是电量播报**:`0b 7b <毫伏 u16 LE> <flags> <百分比>`。
+- **`FFFFFF` 不是特殊功能码**,是 VKeyCodeHelper 反查失败时的格式化兜底
+  (地球键 0x3F 在表里 page=0,反查不到)。写入用真键码 `3F` 即可。
+- hidapi 在 macOS 上把 65 字节报文截成 64,去掉 0x55 只剩 63 字节。按整块截断解密即可。

@@ -321,6 +321,36 @@ agent 状态联动,不在再造一个 AHK。真需要脚本能力时,动作里�
 
 ---
 
+## 06b. macOS workflow 生态:能接什么(2026-08-27 调研)
+
+结论:**Apple 快捷指令在 GitHub 上没有权威集合**。它的分享靠 iCloud 链接
+(RoutineHub / 各家 gallery),链接会失效、内容会变。搜 `awesome shortcuts apple`
+`macos shortcuts collection` 基本无有效结果,最像的 `extratone/shortcutsgallery` 只有 5★。
+
+有真实 GitHub 生态的是另外两家,但都要另装 App:
+
+| 生态 | GitHub 体量 | 程序化入口 |
+| --- | --- | --- |
+| **Apple 快捷指令** | 无权威集合 | `/usr/bin/shortcuts run <名字>`、`shortcuts list`、`shortcuts://` |
+| **Alfred** | `zenorocha/alfred-workflows` 12253★、`alfred-workflows/awesome-alfred-workflows` 3178★、`deanishe/alfred-workflow` 2966★ | `alfred://runtrigger/<workflow>/<trigger>/?argument=` |
+| **Raycast** | 扩展分散,`marekbrze/categorized-raycast-extensions` 600★ 做索引 | `raycast://extensions/<author>/<ext>/<cmd>` |
+| Hammerspoon | `Hammerspoon/hammerspoon` 15999★,配置仓库一堆 | Lua,需自己写 |
+
+### 对 VibePal 的取法
+
+**一个 `openURL` 字段同时覆盖四家** —— 它们都注册了自己的 scheme。不用一家写一个集成。
+加一个 `runShortcut`(走 `shortcuts run`)拿下 Apple 那套。
+
+**推荐库不硬编码第三方清单**:链接会烂、还得维护,而且多半在推荐用户机器上没有的东西。
+改成扫本机(`shortcuts list` + `/Applications` 探测),推荐出来的每条都当场能绑。
+本机实测:43 条可用 / 45 条,agent 相关的(询问 ChatGPT / Ask ChatGPT / ask-agent-v1 /
+Voice ChatGPT 1)自动排在最前,未装的 Raycast 与 Alfred 标注了怎么装。
+
+**也因此不做独立的 shell 动作**:快捷指令里自带「运行 Shell 脚本」和「运行 AppleScript」,
+交给它,VibePal 就不用持有「执行任意命令」这个信任边界。
+
+---
+
 ## 07. 源清单
 
 **RMT**

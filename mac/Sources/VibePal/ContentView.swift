@@ -8,7 +8,7 @@ struct ContentView: View {
     @State private var showingSettings = false
     @State private var showingDeviceInfo = false
 
-    private let canvas = CGSize(width: 1180, height: 840)
+    private let canvas = CGSize(width: 1180, height: 700)
 
     var body: some View {
         GeometryReader { proxy in
@@ -48,8 +48,36 @@ struct ContentView: View {
                 }
             }
         }
+        .overlay { controlLinks }
         .clipShape(RoundedRectangle(cornerRadius: 12))
     }
+
+    /// 机身控件 → 对应行的水平引线。行距是照着机身量出来的:
+    /// 旋钮中心到第一颗按键 133pt,三颗按键之间各 95pt,所以旋钮行必须是 169pt 高。
+    /// ponytail: cardTop / dialRowHeight 是跟着照片定的,换 device-source.png 要重量。
+    private var controlLinks: some View {
+        Canvas { ctx, _ in
+            for y in Self.rowCenters {
+                var path = Path()
+                path.move(to: CGPoint(x: 252, y: y))
+                path.addLine(to: CGPoint(x: 441, y: y))
+                ctx.stroke(path, with: .color(Color(hex: 0xE2E2E7)), lineWidth: 1)
+                ctx.fill(Path(ellipseIn: CGRect(x: 249, y: y - 3, width: 6, height: 6)),
+                         with: .color(Color(hex: 0xE2E2E7)))
+            }
+        }
+        .allowsHitTesting(false)
+    }
+
+    /// header 72 + padding 54 + 标题行 35 + spacing 25
+    private static let cardTop: CGFloat = 186
+    private static let dialRowHeight: CGFloat = 169
+    private static let rowCenters: [CGFloat] = [
+        cardTop + dialRowHeight / 2,
+        cardTop + dialRowHeight + 48.5,
+        cardTop + dialRowHeight + 144.5,
+        cardTop + dialRowHeight + 240.5
+    ]
 
     private var header: some View {
         HStack(spacing: 19) {
@@ -87,35 +115,39 @@ struct ContentView: View {
 
             Spacer(minLength: 20)
 
-            HStack(spacing: 9) {
-                figmaAsset("connection").frame(width: 19, height: 19)
-                Text(device.isConnected ? "已连接" : "未连接").font(.system(size: 17))
-                if device.isConnected {
-                    figmaAsset("online").frame(width: 9, height: 9)
-                } else {
-                    Circle().fill(Color(hex: 0xC7C7CC)).frame(width: 9, height: 9)
+            // 连接状态和电量都只有设备 SDK 才说得出来。没装 Ulanzi Studio 就整块不显示,
+            // 而不是显示一排「未连接 / —」—— 那会让人以为是设备坏了。
+            if device.sdkAvailable {
+                HStack(spacing: 9) {
+                    figmaAsset("connection").frame(width: 19, height: 19)
+                    Text(device.isConnected ? "已连接" : "未连接").font(.system(size: 17))
+                    if device.isConnected {
+                        figmaAsset("online").frame(width: 9, height: 9)
+                    } else {
+                        Circle().fill(Color(hex: 0xC7C7CC)).frame(width: 9, height: 9)
+                    }
+                    Button { showingDeviceInfo.toggle() } label: {
+                        Image(systemName: "questionmark.circle")
+                            .font(.system(size: 17))
+                            .foregroundStyle(Color(hex: 0x8C8D91))
+                    }
+                    .buttonStyle(.plain)
+                    .help("设备详情")
+                    .popover(isPresented: $showingDeviceInfo, arrowEdge: .bottom) {
+                        deviceStatusCard.frame(width: 260).padding(16)
+                    }
                 }
-                Button { showingDeviceInfo.toggle() } label: {
-                    Image(systemName: "questionmark.circle")
-                        .font(.system(size: 17))
-                        .foregroundStyle(Color(hex: 0x8C8D91))
+
+                divider(width: 1, height: 26)
+
+                HStack(spacing: 10) {
+                    figmaAsset("battery").frame(width: 29, height: 16)
+                    Text(device.batteryPercent.map { "\($0)%" } ?? "—").font(.system(size: 17))
                 }
-                .buttonStyle(.plain)
-                .help("设备详情")
-                .popover(isPresented: $showingDeviceInfo, arrowEdge: .bottom) {
-                    deviceStatusCard.frame(width: 260).padding(16)
-                }
+                .opacity(device.isConnected ? 1 : 0.35)
+
+                divider(width: 1, height: 26)
             }
-
-            divider(width: 1, height: 26)
-
-            HStack(spacing: 10) {
-                figmaAsset("battery").frame(width: 29, height: 16)
-                Text(device.batteryPercent.map { "\($0)%" } ?? "—").font(.system(size: 17))
-            }
-            .opacity(device.isConnected ? 1 : 0.35)
-
-            divider(width: 1, height: 26)
 
             Button { showingSettings = true } label: {
                 figmaAsset("settings").frame(width: 24, height: 24)
@@ -132,7 +164,7 @@ struct ContentView: View {
     }
 
     private var devicePanel: some View {
-        ZStack {
+        ZStack(alignment: .top) {
             Color(hex: 0xFBFBFC)
             Color.clear
                 .frame(width: 254, height: 628)
@@ -140,11 +172,11 @@ struct ContentView: View {
                     figmaAsset("device-source", ext: "png")
                         .resizable()
                         .frame(width: 1180, height: 840)
-                        .offset(x: -83, y: -99)
+                        .offset(x: -83, y: -113)
                 }
                 .clipped()
         }
-        .frame(width: 400, height: 768)
+        .frame(width: 400, height: 628)
         .clipped()
         .overlay(alignment: .trailing) { divider(width: 1) }
     }
@@ -229,8 +261,8 @@ struct ContentView: View {
         }
         .padding(.leading, 41)
         .padding(.trailing, 46)
-        .padding(.top, 46)
-        .frame(width: 780, height: 768, alignment: .topLeading)
+        .padding(.top, 54)
+        .frame(width: 780, height: 628, alignment: .topLeading)
         .background(Color(hex: 0xFBFBFC))
     }
 
@@ -251,7 +283,7 @@ struct ContentView: View {
                             .font(.system(size: 18, weight: .medium))
                             .foregroundStyle(Color(hex: 0x2E2E33))
                     }
-                    .frame(width: 104, height: 64)
+                    .frame(width: 108, height: 116)
                     .background(.white, in: RoundedRectangle(cornerRadius: 8))
                     .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color(hex: 0xD6D6DB)))
                 }
@@ -259,7 +291,7 @@ struct ContentView: View {
             }
         }
         .padding(.horizontal, 21)
-        .frame(height: 95)
+        .frame(height: Self.dialRowHeight)
     }
 
     private func mappingRow(_ control: ControlID) -> some View {
@@ -510,6 +542,7 @@ private struct MappingEditor: View {
 private struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var device: DeviceMonitor
+    @EnvironmentObject private var hotkeys: HotkeyListener
     let profileName: String
     let reset: () -> Void
     @State private var probeReport: URL?
@@ -520,20 +553,33 @@ private struct SettingsView: View {
         VStack(spacing: 0) {
             Form {
                 Section("设备") {
-                    LabeledContent("状态", value: device.status)
-                    LabeledContent("电量", value: device.batteryPercent.map { "\($0)%\(device.charging ? " 充电中" : "")" } ?? "未知")
-                    LabeledContent("SDK", value: device.sdkVersion.map { "kwdm \($0)" } ?? "未加载")
+                    if device.sdkAvailable {
+                        LabeledContent("状态", value: device.status)
+                        LabeledContent("电量", value: device.batteryPercent.map { "\($0)%\(device.charging ? " 充电中" : "")" } ?? "未知")
+                        LabeledContent("SDK", value: device.sdkVersion.map { "kwdm \($0)" } ?? "未加载")
+                    } else {
+                        // 没 SDK 不是故障,是另一种正常形态 —— 说清楚少了什么,别摆一排「未知」。
+                        LabeledContent("设备功能", value: "未开启")
+                        Text("装上 Ulanzi Studio 可解锁电量、序列号和写固件。监听哨兵键不需要 SDK,但要先把它们写进固件 —— 没有 SDK 就得在 Ulanzi Studio 里手配一次。")
+                            .font(.system(size: 11))
+                            .foregroundStyle(.secondary)
+                    }
+                    LabeledContent("哨兵键",
+                                   value: "\(hotkeys.registered.count)/\(ControlID.allCases.count) 已注册")
                     LabeledContent("当前预设", value: profileName)
                 }
 
                 Section("权限") {
                     permissionRow("快捷键", granted: shortcutGranted,
                                   hint: "没有它按键发不出去") { ShortcutRunner.requestAccessibilityPermission() }
-                    permissionRow("输入监视", granted: device.inputMonitoringGranted,
-                                  hint: "没有它 SDK 认不到设备") { DeviceMonitor.openInputMonitoringSettings() }
+                    if device.sdkAvailable {
+                        permissionRow("输入监视", granted: device.inputMonitoringGranted,
+                                      hint: "没有它 SDK 认不到设备") { DeviceMonitor.openInputMonitoringSettings() }
+                    }
                 }
 
                 Section("诊断") {
+                    if device.sdkAvailable {
                     LabeledContent("能力探测") {
                         HStack(spacing: 8) {
                             if let probeReport {
@@ -555,6 +601,11 @@ private struct SettingsView: View {
                         Text(device.recentMessages.first ?? "等待设备消息…")
                             .foregroundStyle(.secondary)
                             .lineLimit(2)
+                    }
+                    } else {
+                        Text("设备诊断需要 Ulanzi Studio 提供的 SDK。")
+                            .font(.system(size: 11))
+                            .foregroundStyle(.secondary)
                     }
                 }
             }

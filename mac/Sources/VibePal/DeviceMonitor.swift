@@ -56,6 +56,8 @@ final class DeviceMonitor: ObservableObject {
     private static let appKey = "BF1C7D81"
     static let dylib = "/Applications/Ulanzi Studio.app/Contents/Frameworks/kwdm.dylib"
 
+    /// 装了 Ulanzi Studio 才有设备 SDK。没有就是纯哨兵键模式 —— 界面把设备那部分整块藏掉。
+    @Published private(set) var sdkAvailable = false
     @Published var isConnected = false
     @Published var deviceID: String?
     @Published var sdkVersion: String?
@@ -101,6 +103,14 @@ final class DeviceMonitor: ObservableObject {
 
     func start() {
         Self.shared = self
+
+        // SDK 是可选的。没装 Ulanzi Studio 就整块跳过:哨兵键那条路不经过这里,照常工作。
+        // 权限也一起跳过 —— 「输入监视」只有 SDK 认设备才要,没 SDK 还弹框是白打扰用户。
+        guard FileManager.default.fileExists(atPath: Self.dylib) else {
+            status = "未装 Ulanzi Studio —— 设备功能关闭,哨兵键仍然工作"
+            return
+        }
+
         refreshPermission()
         if !inputMonitoringGranted {
             // 只有「从未问过」时系统才会弹框;被拒过就得手动去设置里开。
@@ -108,15 +118,12 @@ final class DeviceMonitor: ObservableObject {
             refreshPermission()
         }
 
-        guard FileManager.default.fileExists(atPath: Self.dylib) else {
-            status = "找不到 Ulanzi Studio —— 当前版本需要它提供设备 SDK"
-            return
-        }
         guard let h = dlopen(Self.dylib, RTLD_NOW) else {
             status = "SDK 加载失败: \(String(cString: dlerror()))"
             return
         }
         handle = h
+        sdkAvailable = true
 
         if let vsym = dlsym(h, "sdkVersion") {
             let f = unsafeBitCast(vsym, to: (@convention(c) () -> UnsafePointer<CChar>?).self)
@@ -318,6 +325,7 @@ final class DeviceMonitor: ObservableObject {
         vlog("CONNECTED \(id)")
         vlog("输入源: \(InputMethodScan.installedInputSources().joined(separator: ", "))")
         for sug in InputMethodScan.voiceSuggestions() { vlog("建议 \(sug.name) -> \(sug.content)  (\(sug.why))") }
+        logWorkflowRecipes()
         isConnected = true
         deviceID = id
         status = "已连接"
@@ -329,6 +337,22 @@ final class DeviceMonitor: ObservableObject {
         // 自检会改设备设置,不该每次启动都跑;需要时用环境变量触发
         if ProcessInfo.processInfo.environment["VIBEPAL_SELFTEST"] != nil {
             DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) { [weak self] in self?.runSelfTest() }
+        }
+    }
+
+    /// 把本机可用的 workflow 配方记一笔 —— 和上面的输入法建议同一个用途:
+    /// 界面还没接上时,先让人知道这台机器上有什么能绑。
+    private func logWorkflowRecipes() {
+        let recipes = WorkflowCatalog.recipes()
+        let usable = recipes.filter(\.available)
+        vlog("workflow 配方 \(usable.count) 条可用 / 共 \(recipes.count) 条")
+        for r in usable.prefix(8) {
+            let what = r.mapping.runShortcut.map { "快捷指令「\($0)」" }
+                ?? r.mapping.openURL.map { "打开 \($0)" } ?? "?"
+            vlog("  · \(r.title) -> \(what)")
+        }
+        for r in recipes where !r.available {
+            vlog("  ✗ \(r.title) —— \(r.howToGet ?? "不可用")")
         }
     }
 

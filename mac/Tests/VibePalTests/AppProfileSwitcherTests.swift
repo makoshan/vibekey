@@ -28,7 +28,7 @@ final class AppProfileSwitcherTests: XCTestCase {
         let store = try makeStore()
         store.selectedProfileID = "gallery"
         let sw = AppProfileSwitcher()
-        sw.start(store)
+        sw.start(store, initialFrontmost: nil)   // 不受测试机当前前台 App 影响
 
         sw.frontmostChanged(to: "com.anthropic.claudefordesktop")
         XCTAssertEqual(store.selectedProfileID, "claude")
@@ -45,7 +45,7 @@ final class AppProfileSwitcherTests: XCTestCase {
         let store = try makeStore()
         store.selectedProfileID = "claude"
         let sw = AppProfileSwitcher()
-        sw.start(store)
+        sw.start(store, initialFrontmost: nil)   // 不受测试机当前前台 App 影响
         sw.frontmostChanged(to: Bundle.main.bundleIdentifier)
         XCTAssertEqual(store.selectedProfileID, "claude")
         sw.stop()
@@ -56,7 +56,7 @@ final class AppProfileSwitcherTests: XCTestCase {
         let store = try makeStore()
         store.selectedProfileID = "daily"
         let sw = AppProfileSwitcher()
-        sw.start(store)
+        sw.start(store, initialFrontmost: nil)   // 不受测试机当前前台 App 影响
         sw.frontmostChanged(to: "com.openai.codex")
         XCTAssertEqual(store.selectedProfileID, "codex")
         sw.enabled = false

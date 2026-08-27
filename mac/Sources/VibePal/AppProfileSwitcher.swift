@@ -37,7 +37,10 @@ final class AppProfileSwitcher: ObservableObject {
         profiles.compactMap { p in appBundleID(of: p).map { (bundleID: $0, profileID: p.id) } }
     }
 
-    func start(_ store: ProfileStore) {
+    /// `initialFrontmost` 默认取真实前台 App —— 启动时先对一次,别等到下次切换。
+    /// 参数化出来是为了可测:否则 start() 一调就去读真实环境,测试结果随当时开着什么 App 变。
+    func start(_ store: ProfileStore,
+               initialFrontmost: String? = NSWorkspace.shared.frontmostApplication?.bundleIdentifier) {
         guard observer == nil else { return }
         self.store = store
         observer = NSWorkspace.shared.notificationCenter.addObserver(
@@ -48,8 +51,7 @@ final class AppProfileSwitcher: ObservableObject {
             let id = app?.bundleIdentifier
             MainActor.assumeIsolated { self?.frontmostChanged(to: id) }
         }
-        // 启动时先按当前前台 App 对一次,别等到下次切换
-        frontmostChanged(to: NSWorkspace.shared.frontmostApplication?.bundleIdentifier)
+        frontmostChanged(to: initialFrontmost)
     }
 
     func stop() {
