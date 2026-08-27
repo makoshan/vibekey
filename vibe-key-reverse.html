@@ -1,0 +1,611 @@
+<title>Vibe Key 逆向</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Source+Sans+3:ital,wght@0,400;0,600;1,400&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+  :root {
+    --paper:      #F5F6F8;
+    --card:       #FFFFFF;
+    --ink:        #15171C;
+    --muted:      #5B6270;
+    --faint:      #868D9B;
+    --line:       #DEE1E7;
+    --line-soft:  #E9EBEF;
+    --accent:     #B4530A;
+    --accent-bg:  #FBF0E6;
+    --code-bg:    #EDEFF3;
+
+    --st-idle:    #2C6FD1;
+    --st-think:   #7343B8;
+    --st-work:    #17843F;
+    --st-error:   #C3352B;
+    --st-attn:    #B07C00;
+
+    --sp: 1.5rem;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper:     #121419;
+      --card:      #191C22;
+      --ink:       #E8EAEF;
+      --muted:     #9BA2B0;
+      --faint:     #767D8B;
+      --line:      #272B34;
+      --line-soft: #21252C;
+      --accent:    #E9903F;
+      --accent-bg: #2A1D11;
+      --code-bg:   #1E222A;
+
+      --st-idle:   #6BA5F0;
+      --st-think:  #B08AE6;
+      --st-work:   #4FBE78;
+      --st-error:  #EE7A70;
+      --st-attn:   #DDB13A;
+    }
+  }
+  :root[data-theme="dark"] {
+    --paper:     #121419;
+    --card:      #191C22;
+    --ink:       #E8EAEF;
+    --muted:     #9BA2B0;
+    --faint:     #767D8B;
+    --line:      #272B34;
+    --line-soft: #21252C;
+    --accent:    #E9903F;
+    --accent-bg: #2A1D11;
+    --code-bg:   #1E222A;
+
+    --st-idle:   #6BA5F0;
+    --st-think:  #B08AE6;
+    --st-work:   #4FBE78;
+    --st-error:  #EE7A70;
+    --st-attn:   #DDB13A;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: "Source Sans 3", ui-sans-serif, -apple-system, "PingFang SC", sans-serif;
+    font-size: 17px;
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap {
+    max-width: 50rem;
+    margin: 0 auto;
+    padding: 4.5rem 1.5rem 6rem;
+    display: flex;
+    flex-direction: column;
+    gap: 3.25rem;
+  }
+
+  h1, h2, h3 {
+    font-family: "Bricolage Grotesque", ui-sans-serif, -apple-system, "PingFang SC", sans-serif;
+    text-wrap: balance;
+    margin: 0;
+    line-height: 1.15;
+  }
+  h1 { font-size: clamp(2.3rem, 6vw, 3.1rem); font-weight: 700; letter-spacing: -0.02em; }
+  h2 { font-size: 1.55rem; font-weight: 700; letter-spacing: -0.012em; }
+  h3 { font-size: 1.08rem; font-weight: 600; }
+
+  p { margin: 0; }
+  a { color: var(--accent); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+  a:hover { text-decoration-thickness: 2px; }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 3px; }
+
+  code, .mono { font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace; }
+  code {
+    font-size: 0.83em;
+    background: var(--code-bg);
+    padding: 0.13em 0.4em;
+    border-radius: 4px;
+  }
+
+  .eyebrow {
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-size: 0.72rem;
+    letter-spacing: 0.13em;
+    text-transform: uppercase;
+    color: var(--faint);
+  }
+
+  header { display: flex; flex-direction: column; gap: 1.1rem; }
+  .lede { font-size: 1.16rem; color: var(--muted); max-width: 40rem; }
+  .meta {
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-size: 0.78rem;
+    color: var(--faint);
+    display: flex; flex-wrap: wrap; gap: 0.5rem 1.25rem;
+    padding-top: 0.4rem;
+    border-top: 1px solid var(--line);
+  }
+
+  section { display: flex; flex-direction: column; gap: 1.15rem; }
+
+  .chips { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+  .chip {
+    display: inline-flex; align-items: center; gap: 0.42rem;
+    font-size: 0.82rem; font-weight: 600;
+    padding: 0.3rem 0.7rem;
+    border-radius: 999px;
+    border: 1px solid var(--line);
+    background: var(--card);
+    color: var(--muted);
+  }
+  .chip .dot { width: 7px; height: 7px; border-radius: 50%; flex: none; }
+  .chip.done  .dot { background: var(--st-work); }
+  .chip.open  .dot { background: var(--st-attn); }
+  .chip.block .dot { background: var(--st-error); }
+  .chip.dead  .dot { background: var(--faint); }
+
+  .card {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 1.35rem 1.45rem;
+    display: flex; flex-direction: column; gap: 0.8rem;
+  }
+
+  .scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+  table { border-collapse: collapse; width: 100%; font-size: 0.93rem; }
+  th, td {
+    text-align: left;
+    padding: 0.55rem 0.9rem 0.55rem 0;
+    border-bottom: 1px solid var(--line-soft);
+    vertical-align: top;
+  }
+  th {
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-size: 0.71rem; letter-spacing: 0.09em; text-transform: uppercase;
+    color: var(--faint); font-weight: 400;
+    border-bottom: 1px solid var(--line);
+    white-space: nowrap;
+  }
+  td.mono { font-variant-numeric: tabular-nums; font-size: 0.86rem; }
+  tr:last-child td { border-bottom: none; }
+
+  pre {
+    margin: 0;
+    background: var(--code-bg);
+    border: 1px solid var(--line-soft);
+    border-radius: 8px;
+    padding: 1rem 1.1rem;
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-size: 0.79rem;
+    line-height: 1.75;
+    overflow-x: auto;
+    color: var(--ink);
+  }
+  pre .c { color: var(--faint); }
+  pre .a { color: var(--accent); }
+
+  ul, ol { margin: 0; padding-left: 1.3rem; display: flex; flex-direction: column; gap: 0.45rem; }
+  li::marker { color: var(--faint); }
+
+  .callout {
+    border-left: 3px solid var(--accent);
+    background: var(--accent-bg);
+    padding: 0.9rem 1.1rem;
+    border-radius: 0 8px 8px 0;
+    font-size: 0.96rem;
+  }
+  .callout strong { color: var(--accent); }
+
+  .steps { display: flex; flex-direction: column; gap: 0; counter-reset: s; list-style: none; padding: 0; }
+  .steps li {
+    counter-increment: s;
+    display: grid;
+    grid-template-columns: 2.1rem 1fr;
+    gap: 0 0.9rem;
+    padding: 0.95rem 0;
+    border-bottom: 1px solid var(--line-soft);
+  }
+  .steps li:last-child { border-bottom: none; }
+  .steps li::before {
+    content: counter(s, decimal-leading-zero);
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-size: 0.78rem;
+    color: var(--accent);
+    padding-top: 0.18rem;
+  }
+  .steps h3 { margin-bottom: 0.2rem; }
+  .steps p { font-size: 0.94rem; color: var(--muted); }
+
+  .opts { display: grid; gap: 0.9rem; grid-template-columns: 1fr; }
+  @media (min-width: 46rem) { .opts { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+  .opt { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 1.1rem; display: flex; flex-direction: column; gap: 0.6rem; }
+  .opt.pick { border-color: var(--accent); }
+  .opt h3 { font-size: 1rem; }
+  .opt p { font-size: 0.89rem; color: var(--muted); }
+  .opt .tag { font-family: "JetBrains Mono", monospace; font-size: 0.68rem; letter-spacing: 0.09em; text-transform: uppercase; color: var(--faint); }
+  .opt.pick .tag { color: var(--accent); }
+
+  .flow { font-family: "JetBrains Mono", ui-monospace, monospace; font-size: 0.78rem; line-height: 2; white-space: pre; color: var(--muted); }
+  .flow b { color: var(--ink); font-weight: 600; }
+  .flow .hot { color: var(--accent); font-weight: 600; }
+
+  footer { border-top: 1px solid var(--line); padding-top: 1.5rem; font-size: 0.88rem; color: var(--faint); }
+</style>
+
+<div class="wrap">
+
+  <header>
+    <div class="eyebrow">Ulanzi AU05 · 研究进度与方案</div>
+    <h1>Vibe Key 逆向</h1>
+    <p class="lede">
+      把这块「vibe coding 状态键盘」从官方 App 里解放出来,做成能自己驱动、能分发给别人的第三方工具。
+      协议已摸到底,代码已跑通两端,现在卡在一处加密上——本文交代到哪了、下一步怎么走。
+    </p>
+    <div class="chips">
+      <span class="chip done"><span class="dot"></span>协议架构 已摸清</span>
+      <span class="chip done"><span class="dot"></span>厂商 SDK 已接管加密</span>
+      <span class="chip done"><span class="dot"></span>灯效下发 已实现</span>
+      <span class="chip done"><span class="dot"></span>hook 延迟 2.7s → 0.01s</span>
+      <span class="chip open"><span class="dot"></span>待硬件在场验证</span>
+      <span class="chip dead"><span class="dot"></span>蓝牙 已排除</span>
+    </div>
+    <div class="meta">
+      <span>2026-08-24</span>
+      <span>设备 AU05 · VID 0xFFF1 / PID 0x00DD</span>
+      <span>对手 Ulanzi Studio 3.2.11</span>
+    </div>
+  </header>
+
+  <section>
+    <div class="eyebrow">01 — 目标</div>
+    <h2>这是个什么东西</h2>
+    <p>
+      硬件叫 <strong>Vibe Key</strong>,型号 <strong>AU05</strong>:一块铝合金手持控制器,一个旋钮 +
+      麦克风键 + ✓ 确认键 + ✕ 取消键 + 侧边键。卖点是把 AI 编码 agent 的实时状态用灯效显示出来,
+      并且能一键确认/取消/语音输入。
+    </p>
+    <p>
+      官方软件 <code>Ulanzi Studio</code> 是 Qt/C++ 写的,内置一份 Node.js 运行时跑 Stream Deck 风格的插件。
+      它已经支持 8 种 agent:Claude Code、Codex、Gemini CLI、Cursor、Copilot CLI、Kimi、Kiro、CodeBuddy,
+      把各家的 hook 事件翻译成 8 个设备状态。
+    </p>
+    <div class="scroll">
+      <table>
+        <thead><tr><th>状态</th><th>触发事件(以 Claude Code 为例)</th></tr></thead>
+        <tbody>
+          <tr><td style="color:var(--st-idle);font-weight:600">idle 待命</td><td class="mono">SessionStart</td></tr>
+          <tr><td style="color:var(--st-think);font-weight:600">thinking 思考</td><td class="mono">UserPromptSubmit</td></tr>
+          <tr><td style="color:var(--st-work);font-weight:600">working 工作</td><td class="mono">PreToolUse · PostToolUse · SubagentStart/Stop</td></tr>
+          <tr><td style="color:var(--st-error);font-weight:600">error 出错</td><td class="mono">PostToolUseFailure · StopFailure</td></tr>
+          <tr><td style="color:var(--st-attn);font-weight:600">attention 待确认</td><td class="mono">Stop</td></tr>
+          <tr><td style="color:var(--muted);font-weight:600">notification 通知</td><td class="mono">Notification · PermissionRequest</td></tr>
+          <tr><td style="color:var(--muted);font-weight:600">sweeping 清理</td><td class="mono">PreCompact</td></tr>
+          <tr><td style="color:var(--muted);font-weight:600">sleeping 休眠</td><td class="mono">SessionEnd</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <div class="eyebrow">02 — 已确认</div>
+    <h2>官方链路长什么样</h2>
+    <p>
+      这条链路是逆出来的,每一段都验证过。关键收获:<strong>大部分环节是明文的</strong>,
+      Ulanzi 自己把 <code>ustudio-cli</code> 的 Node 参考实现原样装到了磁盘上,协议基本等于白送。
+    </p>
+    <div class="card scroll">
+      <div class="flow"><b>AI agent hooks</b>
+   │  <span class="c">明文 JSON,事件名 + session 元数据</span>
+   ▼
+<b>ustudio-cli</b>  <span class="c">(Qt 编译版,带排队重试)</span>
+   │  <span class="c">localhost:3906 WebSocket</span>
+   ▼
+<b>Ulanzi Studio</b>  <span class="c">(Qt 主程序,查配置 / 决定灯效)</span>
+   │
+   ▼
+<span class="hot">kwdm.dylib</span>  <span class="c">← 加密就在这里(Kehwin 厂商 SDK)</span>
+   │  <span class="c">-[KehwinDevice writeWorker] → -[HidDevice sendData:value:]</span>
+   ▼
+<b>IOHIDDeviceSetReport</b>  <span class="c">(IOKit,不是 hidapi)</span>
+   │
+   ▼
+<b>AU05 设备</b>  <span class="c">USB HID</span></div>
+    </div>
+
+    <h3>设备暴露的 HID 接口</h3>
+    <div class="scroll">
+      <table>
+        <thead><tr><th>Usage Page</th><th>用途</th><th>加密</th></tr></thead>
+        <tbody>
+          <tr><td class="mono">0x0001 / 0x06</td><td>标准键盘 —— 默认模式的按键码走这里</td><td>否</td></tr>
+          <tr><td class="mono">0x000c</td><td>消费控制 —— 旋钮音量 (0xEA / 0xE9)</td><td>否</td></tr>
+          <tr><td class="mono">0x0001 / 0x02</td><td>鼠标</td><td>否</td></tr>
+          <tr><td class="mono">0xfffc</td><td><strong>厂商控制口</strong> —— 自定义按键上报 + 灯效下发</td><td style="color:var(--st-error);font-weight:600">是</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>两种模式(这是整件事的关键)</h3>
+    <ul>
+      <li><strong>默认模式</strong>(官方 App 没跑):按键走标准 HID 键码,不加密、跨平台通用。</li>
+      <li><strong>自定义模式</strong>(App 发了激活命令后):按键改走 <code>0xfffc</code> 加密口,由 App 查配置后
+        用 <code>CGEvent</code> 注入真正的快捷键。</li>
+    </ul>
+
+    <h3>默认模式下各控件实测行为</h3>
+    <div class="scroll">
+      <table>
+        <thead><tr><th>控件</th><th>默认发什么</th><th>第三方可读</th></tr></thead>
+        <tbody>
+          <tr><td>✓ 确认键</td><td class="mono">Return</td><td style="color:var(--st-work)">可以</td></tr>
+          <tr><td>🎤 麦克风键</td><td class="mono">Fn / globe(可触发听写)</td><td style="color:var(--st-work)">可以</td></tr>
+          <tr><td>旋钮 转动</td><td class="mono">音量 ±</td><td style="color:var(--st-work)">可以</td></tr>
+          <tr><td>旋钮 按下</td><td class="mono">切换输入法</td><td style="color:var(--st-work)">可以</td></tr>
+          <tr><td>✕ 取消键</td><td class="mono">无</td><td style="color:var(--st-error)">哑的</td></tr>
+          <tr><td>侧边键</td><td class="mono">无</td><td style="color:var(--st-error)">哑的</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="callout">
+      <strong>这条决定了方案走向。</strong> ✕ 和侧边键在默认模式下完全不发东西——它们只在自定义模式的加密口上报。
+      所以「全键可编程 + 灯效显示」绕不开破解那道加密。
+    </div>
+  </section>
+
+  <section>
+    <div class="eyebrow">03 — 卡点</div>
+    <h2>厂商通道的加密</h2>
+    <p>收发共用一套格式:report id <code>0x55</code>,定长 64 字节,结构是「1 字节头 + 8 字节密文块 + 恒定填充块反复」。</p>
+    <pre><span class="c">// 设备心跳,每 ~10.1 秒一帧,内容恒定</span>
+55 <span class="a">9a e7 f3 05 32 03 f0 db</span> 38 90 c4 99 a3 60 aa ad 38 90 c4 …
+   └─ 数据块 ─┘             └─ 恒定填充,反复到底 ─┘
+
+<span class="c">// App 下发的灯效帧(lldb 断 IOHIDDeviceSetReport 抓到)</span>
+55 <span class="a">4a c5 c6 12 01 88 4a 2d</span> 38 90 c4 99 a3 60 aa ad …   <span class="c">← 空闲轮询,重复数十次</span>
+55 <span class="a">24 56 9e f2 28 e1 45 a1</span> 38 90 c4 99 a3 60 aa ad …
+55 <span class="a">3c ea 0f c0 ad ec 89 47</span> 38 90 c4 99 a3 60 aa ad …</pre>
+    <h3>已经推出来的性质</h3>
+    <ul>
+      <li><strong>64 位分组 ECB,静态密钥</strong>——恒定明文加出恒定密文(那个反复出现的填充块就是证据)。</li>
+      <li><strong>收发同一把密钥</strong>——两个方向的填充块字节完全一致。</li>
+      <li><strong>确定性</strong>——同一个键每次按,64 字节逐字节相同(隔 10 秒两次按,一模一样)。</li>
+      <li><strong>加密位置已定位</strong>——在 <code>kwdm.dylib</code>(Kehwin 厂商 SDK,体积小、可静态分析),
+        不在庞大的 Qt 主程序里。</li>
+      <li>算法未在字符串层暴露;TEA/XTEA 的 <code>0x9E3779B9</code> 常量不存在。</li>
+    </ul>
+
+    <h3>抓包工具链(已跑通,可复用)</h3>
+    <ul>
+      <li><code>DYLD_INSERT_LIBRARIES</code> 注入 <strong>失败</strong>——AMFI 记着 App 的公证出身,
+        重签 + 去硬化运行时都没用,连 <code>__RESTRICT</code> 段都没有也照样剥。</li>
+      <li><code>lldb</code> Python 驱动 <strong>成功</strong>——断点打在 <code>IOHIDDeviceSetReport</code> /
+        <code>IOHIDDeviceGetReport</code>,自动 dump 参数并续跑。输出帧就是这么拿到的。</li>
+    </ul>
+    <div class="callout">
+      <strong>后续:这道墙绕过去了,不用破。</strong> 顺着 lldb 抓到的调用栈往下查
+      <code>kwdm.dylib</code>,发现它根本不是内部库——见下一节。上面这些密码学性质现在只剩
+      参考价值(留给 v2 干净实现用)。
+    </div>
+  </section>
+
+  <section>
+    <div class="eyebrow">03b — 突破</div>
+    <h2>kwdm.dylib 是一整套导出的 C SDK</h2>
+    <p>
+      <code>Contents/Frameworks/kwdm.dylib</code> 是 <strong>Kehwin 官方 SDK v2.0.47</strong>:
+      约 130 个 C 函数<strong>全部导出</strong>,连函数原型字符串都编在里面。
+      加密、鉴权握手、分帧,它全包了,回调直接吐<strong>明文</strong>。
+    </p>
+    <pre><span class="c">// dlopen 之后直接调,已验证</span>
+dlopen OK
+sdkVersion=<span class="a">2.0.47</span>
+SDK INIT  version(2.0.47)  build(Aug 10 2026 11:35:47)
+<span class="a">Open HID Manager Successfully</span>
+
+<span class="c">// SDK 自己日志里的消息 —— 明文 JSON</span>
+Device Auth:1
+Message:{ access = 1; customCode = 410000; type = dongleVersion; version = "4.4.0"; }
+Message:{ access = 1; code = C3D33I021U3670476; type = dongleSN; }</pre>
+    <h3>参数含义也是白送的</h3>
+    <p>SDK 内嵌的回调选择器直接把每个字段命名了,不用猜:</p>
+    <pre>onMessageDeviceLedEffect:<span class="a">mode:speed:bright:red:green:blue:</span>
+onMessageDeviceKeyEvent:<span class="a">index:status:physicalIndex:</span>
+onMessageDeviceBattery:<span class="a">battery:voltage:charging:chargeFull:lowbat:powerOff:</span></pre>
+    <p>
+      也就是说 <code>setDeviceLedEffect</code> 能设<strong>任意 RGB</strong>,按键事件带上了
+      按下/抬起和物理位号,电池是真值。另外 <code>encrypt_data</code> / <code>decrypt_data</code>
+      也在导出表里——v2 做干净实现时可以拿它当预言机。
+    </p>
+    <div class="callout">
+      <strong>代价说清楚:</strong>走 SDK 这条路,app 依赖你机器上装着 Ulanzi Studio
+      (我们只加载它,<em>绝不分发</em>它的 dylib)。所以分两步:v1 用 SDK,功能今天就全通;
+      v2 再用 SDK 当预言机反推协议,做成能独立分发的干净实现。
+    </div>
+  </section>
+
+  <section>
+    <div class="eyebrow">04 — 已排除</div>
+    <h2>蓝牙这条路不存在</h2>
+    <p>官方连不上蓝牙不是 bug,是这设备压根没有蓝牙。四条独立证据:</p>
+    <ul>
+      <li><strong>BLE 栈只服务另一个产品</strong>:<code>libUlanziFZBle.dylib</code> 里唯一的设备名过滤是
+        <code>Ulanzi TC002</code>(像素时钟),主程序里的发现类直接叫 <code>Tc002Discovery</code>。</li>
+      <li><strong>AU05 是两段式硬件</strong>,固件分开 OTA:<code>Dongle(AU05_USB)</code> 是 USB 接收器,
+        <code>Mic(AU05_Device)</code> 是手持端。</li>
+      <li><strong>无线段是 Nordic 2.4GHz 私有协议</strong>:主程序含 <code>NRF~#P</code>,配套
+        <code>DongleSN</code> / <code>DongleVersion</code> / <code>DongleReboot</code> / <code>Paired</code>。</li>
+      <li>系统蓝牙已配对列表里没有它,<code>device_source.json</code> 的 <code>MacAddress</code> 恒为空。</li>
+    </ul>
+    <div class="callout">
+      <strong>这反而是好消息。</strong> 接收器同样以 USB HID 出现,所以有线直连和 2.4G 无线走的是
+      <em>同一套 HID 代码</em>,不用分两套,也不用碰蓝牙那边的 <code>sendAuthMessage</code> 鉴权握手。
+      实现提示:枚举时按 VID <code>0xFFF1</code> 匹配、放宽 PID,因为接收器 PID 大概率与手持直连不同。
+    </div>
+    <p style="font-size:0.92rem;color:var(--muted)">
+      未做:实机 BLE 广播扫描。ad-hoc 签名的扫描工具被 macOS TCC 拒(连
+      <code>centralManagerDidUpdateState</code> 都不触发)。要 100% 确认,用手机 nRF Connect 扫一次即可。
+    </p>
+  </section>
+
+  <section>
+    <div class="eyebrow">05 — 已交付</div>
+    <h2>现在手上有什么</h2>
+    <div class="card">
+      <h3>vibekey — Rust 内核 + CLI(跨平台)</h3>
+      <p style="font-size:0.94rem;color:var(--muted)">
+        编译通过,单测绿,真机枚举验证过。走 <code>hidapi</code>,所以 macOS / Windows / Linux 同一套代码。
+      </p>
+      <div class="scroll">
+        <table>
+          <tbody>
+            <tr><td class="mono" style="white-space:nowrap">list</td><td>枚举设备的 HID 接口 ✅ 真机可用</td></tr>
+            <tr><td class="mono" style="white-space:nowrap">watch</td><td>dump 原始输入报文(逆向用)✅</td></tr>
+            <tr><td class="mono" style="white-space:nowrap">map</td><td>事件 → 状态解析 ✅</td></tr>
+            <tr><td class="mono" style="white-space:nowrap">hooks</td><td>生成 Claude Code / Codex 的 hook 配置 ✅</td></tr>
+            <tr><td class="mono" style="white-space:nowrap">hook</td><td>hook 入口,读 stdin 解析状态 ⚠ 推送待加密破解</td></tr>
+            <tr><td class="mono" style="white-space:nowrap">set-state</td><td>下发灯效 ⛔ 待加密破解</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <div class="card">
+      <h3>VibePal.app — SwiftUI 原生 Mac App</h3>
+      <p style="font-size:0.94rem;color:var(--muted)">按 Figma 设计稿实现的控制映射界面,已能跑。</p>
+      <ul style="font-size:0.94rem">
+        <li><strong>连接状态是真的</strong>——<code>IOHIDManager</code> 实时枚举 AU05,拔线即变灰。
+          只匹配厂商 usage page,规避了「输入监视」权限。</li>
+        <li><strong>按键注入已具备</strong>——<code>ShortcutRunner</code> 用 <code>CGEvent</code> 发送快捷键
+          (跟官方 <code>InputSimulator::KeyDownEx</code> 同一机制),<code>ProfileStore</code> 管四个控件的配置。</li>
+        <li><strong>缺的只剩「读到按键」</strong>——注入那一半已经完成了。</li>
+      </ul>
+    </div>
+  </section>
+
+    <h3>功能完成度(2026-08-24 实测)</h3>
+    <div class="scroll">
+      <table>
+        <thead><tr><th>功能</th><th>状态</th><th>说明</th></tr></thead>
+        <tbody>
+          <tr><td>设备连接检测</td><td style="color:var(--st-work);font-weight:600;white-space:nowrap">已实现</td><td>IOHIDManager 实时,拔线变灰</td></tr>
+          <tr><td>控制映射 UI + 配置持久化</td><td style="color:var(--st-work);font-weight:600;white-space:nowrap">已实现</td><td>存 UserDefaults</td></tr>
+          <tr><td>快捷键注入机制</td><td style="color:var(--st-attn);font-weight:600;white-space:nowrap">半通</td><td>能发 CGEvent,但只能点界面「测试动作」手动触发</td></tr>
+          <tr><td>麦克风电平</td><td style="color:var(--st-work);font-weight:600;white-space:nowrap">已实现</td><td>AVAudioEngine</td></tr>
+          <tr><td>CLI list / map / hooks</td><td style="color:var(--st-work);font-weight:600;white-space:nowrap">已实现</td><td>真机验证过</td></tr>
+          <tr><td><strong>状态灯效下发</strong>(<code>set-state</code>)</td><td style="color:var(--st-attn);font-weight:600;white-space:nowrap">已写完 · 待验证</td><td>走 SDK <code>setDeviceLedEffect</code>,任意 RGB;等设备在场标定</td></tr>
+          <tr><td><strong>hook → 灯效 全链路</strong></td><td style="color:var(--st-attn);font-weight:600;white-space:nowrap">已写完 · 待验证</td><td>daemon + socket,端到端跑通,只差硬件</td></tr>
+          <tr><td><strong>按设备的键触发动作</strong></td><td style="color:var(--st-error);font-weight:600;white-space:nowrap">未接通</td><td>SDK 有 <code>deviceKeyEvent</code>,尚未接到 ShortcutRunner</td></tr>
+          <tr><td>电池电量</td><td style="color:var(--st-error);font-weight:600;white-space:nowrap">未接通</td><td>界面 85% 仍是常量;SDK 的 <code>getDeviceBattery</code> 未接</td></tr>
+          <tr><td>✕ / 侧边键</td><td style="color:var(--st-error);font-weight:600;white-space:nowrap">未接通</td><td>随「按键触发」一起解决</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>daemon:让 hook 不拖慢 agent</h3>
+    <p>
+      每次 hook 都开一遍 SDK 要 <strong>2.7 秒</strong>——而 <code>PreToolUse</code> 是每次工具调用都触发的,
+      这个延迟直接不可用(官方也正因如此跑 <code>ustudio-cli --singleton-server</code>)。改成常驻:
+    </p>
+    <div class="scroll">
+      <div class="flow"><b>vibekey serve</b>  <span class="c">常驻,独占 SDK 与设备,听 $HOME/.vibekey.sock</span>
+      ▲
+      │  <span class="c">一行文本:state working</span>
+<b>vibekey hook</b>  <span class="c">写完就退出 —— 实测 <span class="hot">0.01s</span></span></div>
+    </div>
+    <div class="callout">
+      <strong>当前真实状态:</strong>代码链路已经端到端跑通了——daemon 起得来、hook 0.01s 投递、
+      状态正确解析,日志里如实报「丢弃(设备不在线)」。<em>唯一缺的是把设备插回来。</em>
+      在硬件验证之前,灯效这块仍应视为「已写完,未证实」。
+    </div>
+  </section>
+
+  <section>
+    <div class="eyebrow">06 — 方案</div>
+    <h2>两步走</h2>
+    <p style="font-size:0.95rem;color:var(--muted)">
+      原先的 A/B/C(破解加密 / 回放密文 / 精简版)已经作废——SDK 把加密接管了,三条路都不用走。
+    </p>
+    <div class="opts" style="grid-template-columns:1fr">
+      <div class="opt pick">
+        <div class="tag">v1 · 进行中</div>
+        <h3>骑在厂商 SDK 上</h3>
+        <p>
+          <code>dlopen</code> 本机已安装的 <code>kwdm.dylib</code>,功能立刻全通:任意 RGB 灯效、
+          真电池、按键事件、按键映射、LCD 图像上传。
+        </p>
+        <p><strong>限制:</strong>需要装着 Ulanzi Studio。自用没问题,不能独立分发。</p>
+      </div>
+      <div class="opt">
+        <div class="tag">v2 · 之后</div>
+        <h3>干净实现,可分发</h3>
+        <p>
+          拿 SDK 当<strong>预言机</strong>——直接调它导出的 <code>encrypt_data</code> /
+          <code>decrypt_data</code> 生成明文↔密文对,反推协议后用 Rust 重写,摆脱依赖。
+        </p>
+        <p><strong>好处:</strong>v1 不是白做——它同时也是 v2 的对照基准。</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="eyebrow">07 — 下一步</div>
+    <h2>按这个顺序推进</h2>
+    <ol class="steps">
+      <li>
+        <div>
+          <h3>把设备插回来,标定灯效</h3>
+          <p>唯一的硬阻塞。设备一上线就跑 <code>vibekey sdk</code> 读回
+            <code>getDeviceLedEffect</code> 的当前值,确定 mode / speed / bright 的合法取值
+            (现在是命令行旋钮 <code>--mode/--speed/--bright</code>,默认值纯属猜测)。
+            然后 <code>vibekey set-state working</code> 应该让它变绿。</p>
+        </div>
+      </li>
+      <li>
+        <div>
+          <h3>接通按键读取</h3>
+          <p>daemon 里监听 <code>deviceKeyEvent</code> 消息,解出 index / status /
+            physicalIndex,交给 Mac App 里<strong>已经写好的</strong> <code>ShortcutRunner</code> 注入。
+            ✕=Esc、侧边键自定义随即可用——注入那一半早就完成了。</p>
+        </div>
+      </li>
+      <li>
+        <div>
+          <h3>Mac App 换用 SDK</h3>
+          <p>把写死的 85% 换成 <code>getDeviceBattery</code> 真值;界面上的映射配置
+            通过 <code>setDeviceButtonShortcutFunction</code> 真正写进设备。</p>
+        </div>
+      </li>
+      <li>
+        <div>
+          <h3>daemon 常驻化</h3>
+          <p><code>vibekey serve</code> 挂成 launchd 服务,开机自起、掉线自恢复。</p>
+        </div>
+      </li>
+      <li>
+        <div>
+          <h3>v2 干净实现 + 分发</h3>
+          <p>拿 SDK 当预言机反推协议后重写,摆脱依赖。CLI 走 Homebrew(零成本);
+            Mac App 公证 DMG(需 99 美元/年开发者号)或 Homebrew cask。</p>
+        </div>
+      </li>
+    </ol>
+  </section>
+
+  <section>
+    <div class="eyebrow">08 — 边界</div>
+    <h2>法律上站得住</h2>
+    <p>
+      为<strong>互操作性</strong>逆向自己买的硬件是受保护的:美国 DMCA §1201(f) 有明确的互操作例外,
+      欧盟软件指令 Art.6 同理。协议本身不受版权保护,自己写的客户端也不受限。
+    </p>
+    <p>要守住的只有两条:</p>
+    <ul>
+      <li><strong>不重新分发</strong>厂商的固件、图标等版权素材。</li>
+      <li><strong>不绕过付费授权</strong>(目前没发现有,插件市场是免费的)。</li>
+    </ul>
+  </section>
+
+  <footer>
+    技术细节的完整记录在仓库的 <code>PROTOCOL.md</code>;逆向脚本(<code>au05_sniff</code>、
+    lldb 驱动 <code>driver2.py</code>)在会话 scratchpad,可复用。
+  </footer>
+
+</div>
