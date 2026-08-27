@@ -18,6 +18,11 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Cmd {
+    /// 直读厂商通道并用内置 TEA 解码器解出按键事件(完全绕开厂商 SDK)
+    Sniff {
+        #[arg(long, default_value = "60")]
+        secs: u64,
+    },
     /// List attached AU05 HID interfaces
     List,
     /// Dump raw input reports (default: vendor page fffc)
@@ -81,6 +86,7 @@ fn parse_hex_u16(s: &str) -> u16 {
 
 fn main() -> Result<()> {
     match Cli::parse().cmd {
+        Cmd::Sniff { secs } => run_sniff(secs)?,
         Cmd::List => {
             let api = HidApi::new()?;
             let ifs = device::interfaces(&api);
@@ -471,4 +477,43 @@ mod tests {
         assert_eq!(parse_daemon_cmd("button six 24"), None);
         assert_eq!(parse_daemon_cmd(""), None);
     }
+}
+
+
+/// 打开厂商通道 0xFFFC,用内置 TEA 解码器实时解按键/电量,不经过厂商 SDK。
+fn run_sniff(secs: u64) -> Result<()> {
+    use std::time::{Duration, Instant};
+    let api = HidApi::new()?;
+    let dev = device::open_page(&api, device::VENDOR_PAGE)?;
+    println!("已打开 0x{:04x},监听 {secs}s —— 请按设备上的键", device::VENDOR_PAGE);
+
+    // function 码 -> 控件名(真机验证)
+    let name = |f: u8| match f {
+        110 => "旋钮按下", 111 => "语音键", 112 => "确认✓", 113 => "取消✕",
+        114 => "旋钮左转", 115 => "旋钮右转", 116 => "侧边键", _ => "未知",
+    };
+
+    let deadline = Instant::now() + Duration::from_secs(secs);
+    let mut buf = [0u8; 256];
+    let (mut keys, mut batt) = (0u32, 0u32);
+    while Instant::now() < deadline {
+        match dev.read_timeout(&mut buf, 500) {
+            Ok(0) => continue,
+            Ok(n) => match tea::decode(&buf[..n]) {
+                Some(tea::Event::Key { index, function, status }) => {
+                    keys += 1;
+                    let act = if status == 1 { "按下" } else { "抬起" };
+                    println!("★ {} (index={index} func={function}) {act}", name(function));
+                }
+                Some(tea::Event::Battery { percent, mv, charging, .. }) => {
+                    batt += 1;
+                    println!("  电量 {percent}% {mv}mV{}", if charging { " 充电中" } else { "" });
+                }
+                _ => {}
+            },
+            Err(e) => { eprintln!("读取出错: {e}"); break; }
+        }
+    }
+    println!("\n统计:按键 {keys} 条,电量 {batt} 条");
+    Ok(())
 }

@@ -388,20 +388,28 @@ final class DeviceMonitor: ObservableObject {
     }
 
     /// SDK 按键编号 → 逻辑控件。真机标定后再确认;未知编号会记进 unknownKeyIndices。
+    /// SDK 上报的 index -> 控件。0-based,真机抓包验证(不是猜):
+    ///   func 111→index 0(语音)、112→1(✓)、113→2(✕)、110→3(旋钮按下)、
+    ///   114→4(旋钮左转)、115→5(旋钮右转)。
+    /// 注意 AU05 被打了 isSwitchKeyIndex=1 补丁,SDK 的 index 取自帧 byte[4]。
     static let keyMap: [Int: ControlID] = [
-        1: .voice,      // 麦克风键
-        2: .confirm,    // ✓
-        3: .cancel,     // ✕
-        4: .dialPress,  // 旋钮按下
-        5: .dialLeft,   // 旋钮左转
-        6: .dialRight,  // 旋钮右转
+        0: .voice,      // 麦克风键
+        1: .confirm,    // ✓
+        2: .cancel,     // ✕
+        3: .dialPress,  // 旋钮按下
+        4: .dialLeft,   // 旋钮左转
+        5: .dialRight,  // 旋钮右转
     ]
 
     private func handleKeyEvent(_ text: String) {
-        guard let idx = Self.intField("index", in: text) else { return }
-        // status: 0 抬起 / 1 按下 —— 只在按下时触发,避免一次按键跑两遍
-        let status = Self.intField("status", in: text) ?? 1
+        // SDK 两种输出风格都要认
+        func field(_ k: String) -> Int? { Self.intField(k, in: text) ?? Self.jsonInt(k, in: text) }
+        guard let idx = field("index") else { return }
+        // status: 0 抬起 / 1 按下。只在按下触发,避免一次按键跑两遍。
+        // 注意旋钮转动(func 114/115)只发 status=1、无抬起 —— 正好每次转动触发一次。
+        let status = field("status") ?? 1
         guard status == 1 else { return }
+        lastKeyEvent = "index=\(idx) \(Self.keyMap[idx].map { $0.title } ?? "未知")"
         if let ctrl = Self.keyMap[idx] {
             onControl?(ctrl)
         } else {
