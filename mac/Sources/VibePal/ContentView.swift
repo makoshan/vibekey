@@ -64,6 +64,8 @@ struct ContentView: View {
                 ctx.stroke(path, with: .color(Color(hex: 0xE2E2E7)), lineWidth: 1)
                 ctx.fill(Path(ellipseIn: CGRect(x: 249, y: y - 3, width: 6, height: 6)),
                          with: .color(Color(hex: 0xE2E2E7)))
+                ctx.fill(Path(ellipseIn: CGRect(x: 438, y: y - 3, width: 6, height: 6)),
+                         with: .color(Color(hex: 0xE2E2E7)))
             }
         }
         .allowsHitTesting(false)
@@ -242,22 +244,27 @@ struct ContentView: View {
 
     private var mappingPanel: some View {
         VStack(alignment: .leading, spacing: 25) {
-            HStack {
+            HStack(alignment: .firstTextBaseline) {
                 Text("控制映射").font(.system(size: 29, weight: .bold))
+                Spacer()
+                Text("点按任意一行修改映射，保存即写入设备")
+                    .font(.system(size: 14))
+                    .foregroundStyle(Color(hex: 0xA0A0A8))
             }
 
             VStack(spacing: 0) {
                 dialRow
-                divider(height: 1)
+                divider(height: 1).padding(.leading, 88)
                 mappingRow(.voice)
-                divider(height: 1)
+                divider(height: 1).padding(.leading, 88)
                 mappingRow(.confirm)
-                divider(height: 1)
+                divider(height: 1).padding(.leading, 88)
                 mappingRow(.cancel)
             }
             .background(.white)
-            .clipShape(RoundedRectangle(cornerRadius: 10))
-            .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color(hex: 0xD6D6DB)))
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color(hex: 0xE4E4E9)))
+            .shadow(color: .black.opacity(0.045), radius: 14, y: 4)
         }
         .padding(.leading, 41)
         .padding(.trailing, 46)
@@ -274,20 +281,10 @@ struct ContentView: View {
             Text("旋钮").font(.system(size: 21, weight: .semibold))
             Spacer(minLength: 12)
             ForEach([ControlID.dialLeft, .dialPress, .dialRight]) { control in
-                Button { editingControl = control } label: {
-                    VStack(spacing: 2) {
-                        Text(control.title.replacingOccurrences(of: "旋钮", with: ""))
-                            .font(.system(size: 14))
-                            .foregroundStyle(Color(hex: 0x8C8D91))
-                        Text(DeviceShortcut.describe(profiles.selectedProfile[control].content))
-                            .font(.system(size: 18, weight: .medium))
-                            .foregroundStyle(Color(hex: 0x2E2E33))
-                    }
-                    .frame(width: 108, height: 116)
-                    .background(.white, in: RoundedRectangle(cornerRadius: 8))
-                    .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color(hex: 0xD6D6DB)))
-                }
-                .buttonStyle(.plain)
+                DialChip(
+                    label: control.title.replacingOccurrences(of: "旋钮", with: ""),
+                    content: profiles.selectedProfile[control].content
+                ) { editingControl = control }
             }
         }
         .padding(.horizontal, 21)
@@ -301,9 +298,7 @@ struct ContentView: View {
                 controlIcon(control.icon)
                 Text(control.title).font(.system(size: 21, weight: .semibold))
                 Spacer()
-                Text(DeviceShortcut.describe(mapping.content))
-                    .font(.system(size: 19))
-                    .foregroundStyle(Color(hex: 0x2E2E33))
+                Keycaps(content: mapping.content, size: 17)
                 figmaAsset("chevron-right").frame(width: 16, height: 16)
             }
             .padding(.horizontal, 21)
@@ -311,6 +306,7 @@ struct ContentView: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .modifier(HoverTint())
     }
 
 }
@@ -668,11 +664,79 @@ private let dictationApps: [(name: String, url: URL)] = [
     ("微信输入法", URL(string: "https://z.weixin.qq.com")!)
 ]
 
+/// "⌘ + L → Return" 这类描述拆成一颗颗键帽。数据仍是 describe 的输出,不另建一套解析。
+private struct Keycaps: View {
+    let content: String
+    var size: CGFloat = 15
+
+    var body: some View {
+        let text = DeviceShortcut.describe(content)
+        if text == "未设置" {
+            Text(text).font(.system(size: size)).foregroundStyle(.tertiary)
+        } else {
+            HStack(spacing: 5) {
+                ForEach(Array(text.components(separatedBy: " → ").enumerated()), id: \.offset) { ci, chord in
+                    if ci > 0 {
+                        Image(systemName: "arrow.right")
+                            .font(.system(size: size - 5))
+                            .foregroundStyle(.tertiary)
+                    }
+                    ForEach(Array(chord.components(separatedBy: " + ").enumerated()), id: \.offset) { _, key in
+                        Text(key)
+                            .font(.system(size: size, weight: .medium))
+                            .foregroundStyle(Color(hex: 0x3A3A40))
+                            .frame(minWidth: size + 9)
+                            .padding(.horizontal, 7)
+                            .padding(.vertical, 5)
+                            .background(Color(hex: 0xF6F6F8), in: RoundedRectangle(cornerRadius: 6))
+                            .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color(hex: 0xDDDDE3)))
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// 行的 hover 底色。每个实例自带状态,挂上去就行。
+private struct HoverTint: ViewModifier {
+    @State private var on = false
+    func body(content: Content) -> some View {
+        content
+            .background(on ? Color(hex: 0xF6F7FA) : .clear)
+            .onHover { on = $0 }
+    }
+}
+
+private struct DialChip: View {
+    let label: String
+    let content: String
+    let action: () -> Void
+    @State private var hovered = false
+
+    var body: some View {
+        Button(action: action) {
+            VStack(spacing: 10) {
+                Text(label)
+                    .font(.system(size: 13))
+                    .foregroundStyle(Color(hex: 0x8C8D91))
+                Keycaps(content: content, size: 15)
+            }
+            .frame(width: 108, height: 116)
+            .background(hovered ? Color(hex: 0xFAFBFF) : .white,
+                        in: RoundedRectangle(cornerRadius: 10))
+            .overlay(RoundedRectangle(cornerRadius: 10)
+                .stroke(hovered ? Color(hex: 0xAFC7F8) : Color(hex: 0xE2E2E7)))
+        }
+        .buttonStyle(.plain)
+        .onHover { hovered = $0 }
+    }
+}
+
 private func controlIcon(_ name: String, size: CGFloat = 51) -> some View {
     ZStack {
         Circle()
             .fill(.white)
-            .overlay(Circle().stroke(Color(hex: 0xBABAC2), lineWidth: 1.2))
+            .overlay(Circle().stroke(Color(hex: 0xC9C9D1), lineWidth: 1.2))
         figmaAsset(name).frame(width: size * 0.55, height: size * 0.55)
     }
     .frame(width: size, height: size)
